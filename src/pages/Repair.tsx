@@ -82,10 +82,17 @@ export default function Repair() {
     const tool = completeModal.tool
     if (!tool) return
     const nextStatus = result === 'repaired' ? 'available' : 'lost'
-    if (!canTransition('repairing', nextStatus)) return
+    
+    // 检查状态转换是否允许
+    if (!canTransition('repairing', nextStatus)) {
+      toast.error(`无法完成维修：状态不能从 'repairing' 转换为 '${nextStatus}'`)
+      return
+    }
+    
     setSubmitting(true)
     try {
-      await supabase
+      // 更新维修记录
+      const { error: updateError } = await supabase!
         .from('repair_records')
         .update({
           completed_at: new Date(completeDate).toISOString(),
@@ -93,14 +100,31 @@ export default function Repair() {
           result,
         })
         .eq('id', completeModal.id)
-      await supabase.from('tools').update({ status: nextStatus }).eq('id', tool.id)
+      
+      if (updateError) {
+        toast.error('更新维修记录失败：' + updateError.message)
+        return
+      }
+      
+      // 更新工具状态
+      const { error: statusError } = await supabase!
+        .from('tools')
+        .update({ status: nextStatus })
+        .eq('id', tool.id)
+      
+      if (statusError) {
+        toast.error('更新工具状态失败：' + statusError.message)
+        return
+      }
+      
       toast.success(t('common.success'))
       setCompleteModal(null)
       setResult('repaired')
       refRepairing()
       refCompleted()
     } catch (e) {
-      toast.error(String(e))
+      console.error('完成维修失败:', e)
+      toast.error('操作失败：' + String(e))
     } finally {
       setSubmitting(false)
     }

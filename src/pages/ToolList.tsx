@@ -38,6 +38,9 @@ export default function ToolList() {
   const [repairVendor, setRepairVendor] = useState('')
   const [repairCost, setRepairCost] = useState('')
   const [repairSentAt, setRepairSentAt] = useState(new Date().toISOString().slice(0, 10))
+  
+  // 删除工具
+  const [deleteConfirmTool, setDeleteConfirmTool] = useState<Tool | null>(null)
 
   // Form state
   const [assetCode, setAssetCode] = useState('')
@@ -368,6 +371,31 @@ export default function ToolList() {
      loadTools()
    } catch (e) {
      toast.error('操作失败：' + String(e))
+   } finally {
+     setSubmitting(false)
+   }
+  }
+
+  // 删除工具（软删除）
+  const handleDeleteTool = async (tool: Tool) => {
+   if (!window.confirm(`确定要删除 "${tool[nameKey]}" (${tool.asset_code}) 吗？\n\n注意：此操作会将工具标记为已删除，不会从数据库中彻底移除。`)) return
+   
+   setSubmitting(true)
+   try {
+     const { error } = await supabase!
+       .from('tools')
+       .update({ 
+         status: 'lost',
+         deleted_at: new Date().toISOString()
+       })
+       .eq('id', tool.id)
+     
+     if (error) throw error
+     
+     toast.success('工具已删除')
+     loadTools()
+   } catch (e) {
+     toast.error('删除失败：' + String(e))
    } finally {
      setSubmitting(false)
    }
@@ -814,6 +842,15 @@ export default function ToolList() {
                           送修
                         </button>
                       )}
+                      {canAdd && (
+                        <button
+                       type="button"
+                          className="text-red-600 hover:underline text-xs"
+                          onClick={() => setDeleteConfirmTool(tool)}
+                        >
+                          删除
+                        </button>
+                      )}
                       <button
                      type="button"
                         className="text-gray-500 hover:underline text-xs"
@@ -961,6 +998,58 @@ export default function ToolList() {
               <button
                 type="button"
                 onClick={() => setSendRepairTool(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除确认对话框 */}
+      {deleteConfirmTool && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setDeleteConfirmTool(null)}
+        >
+          <div
+            className="bg-white rounded-lg max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <span className="text-red-600 text-xl">⚠️</span>
+              </div>
+              <h3 className="font-medium text-gray-800 text-lg">确认删除工具</h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                您确定要删除以下工具吗？
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="font-medium text-gray-800">{deleteConfirmTool[nameKey]}</p>
+                <p className="text-sm text-gray-600">资产编号：{deleteConfirmTool.asset_code}</p>
+                <p className="text-sm text-gray-600">当前状态：{TOOL_STATUS[deleteConfirmTool.status].labelKey}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                ℹ️ 注意：此操作会将工具状态标记为"遗失"，并设置删除时间戳，不会从数据库中彻底移除。
+              </p>
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleDeleteTool(deleteConfirmTool)}
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50 hover:bg-red-700 transition-colors"
+              >
+                {submitting ? '删除中...' : '确认删除'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmTool(null)}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 取消
