@@ -11,6 +11,8 @@ import type { Tool } from '@/types'
 // @ts-ignore - QRCode module declaration exists in types/qrcode.d.ts
 import QRCode from 'qrcode'
 import { useCategories } from '@/hooks/useCategories'
+import { CategorySelector } from '@/components/CategorySelector'
+import { PREDEFINED_CATEGORIES } from '@/components/CategorySelector'
 
 export default function ToolList() {
   const { t, i18n } = useTranslation()
@@ -37,7 +39,6 @@ export default function ToolList() {
   const [locationZh, setLocationZh] = useState('')
   const [locationEn, setLocationEn] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [manualCategory, setManualCategory] = useState(false)
   const [purchaseInfo, setPurchaseInfo] = useState('')
   const [status, setStatus] = useState<string>('available')
   const [model, setModel] = useState('')
@@ -89,14 +90,13 @@ export default function ToolList() {
   const selectedTools = useMemo(() => tools.filter((t) => selectedForPrint.has(t.id)), [tools, selectedForPrint])
 
   const resetForm = () => {
-    setAssetCode('')
-    setNameZh('')
-    setNameEn('')
-    setLocationZh('')
-    setLocationEn('')
-    setCategoryId('')
-    setManualCategory(false)
-    setPurchaseInfo('')
+   setAssetCode('')
+   setNameZh('')
+   setNameEn('')
+   setLocationZh('')
+   setLocationEn('')
+   setCategoryId('')
+   setPurchaseInfo('')
     setStatus('available')
     setModel('')
     setQuantity(1)
@@ -142,12 +142,97 @@ export default function ToolList() {
   if (!currentId) { toast.error('请选择仓库'); return }
   if (!supabase || !isSupabaseConfigured()) { toast.error('Supabase not configured'); return }
 
-  const resolvedCategoryId = (categoryId || categories[0]?.id || '').trim()
-  if (!assetCode.trim() || !nameZh.trim() || !nameEn.trim() || !resolvedCategoryId) {
-      toast.error(t('common.required'))
-      return
+  let resolvedCategoryId = categoryId?.trim()
+  
+  // 处理自定义分类
+  if (resolvedCategoryId?.startsWith('custom-')) {
+   const customName = resolvedCategoryId.replace('custom-', '')
+    if (!customName.trim()) {
+      toast.error(t('tool.categoryRequired'))
+     return
     }
-    setSubmitting(true)
+    
+    // 尝试查找是否已存在同名分类
+   const { data: existingCategory } = await supabase
+      .from('tool_categories')
+      .select('id')
+      .eq('warehouse_id', currentId)
+      .eq('name_zh', customName)
+      .single()
+    
+    if (existingCategory) {
+     resolvedCategoryId = existingCategory.id
+    } else {
+      // 创建新分类
+     const { data: newCategory, error: categoryError } = await supabase
+        .from('tool_categories')
+        .insert({
+         warehouse_id: currentId,
+          name_zh: customName,
+          name_en: customName,
+        })
+        .select('id')
+        .single()
+      
+      if (categoryError) {
+        toast.error(categoryError.message)
+       return
+      }
+     resolvedCategoryId = newCategory.id
+    }
+  } else if (resolvedCategoryId?.startsWith('predefined-')) {
+    // 处理预设分类 - 也需要创建到数据库
+   const parts = resolvedCategoryId.split(':')
+   const presetKey = parts[0]?.replace('predefined-', '') || ''
+   const subItem = parts[1] || ''
+    
+   const presetCategory = PREDEFINED_CATEGORIES.find(c => c.id === `predefined-${presetKey}`)
+    if (!presetCategory) {
+      toast.error('Invalid category')
+     return
+    }
+    
+   const categoryName = subItem || (i18n.language === 'en' ? presetCategory.name_en : presetCategory.name_zh)
+    
+    // 查找或创建分类
+   const { data: existingCategory } = await supabase
+      .from('tool_categories')
+      .select('id')
+      .eq('warehouse_id', currentId)
+      .eq('name_zh', categoryName)
+      .single()
+    
+    if (existingCategory) {
+     resolvedCategoryId = existingCategory.id
+    } else {
+     const { data: newCategory, error: categoryError } = await supabase
+        .from('tool_categories')
+        .insert({
+         warehouse_id: currentId,
+          name_zh: categoryName,
+          name_en: i18n.language === 'en' ? presetCategory.name_en : categoryName,
+        })
+        .select('id')
+        .single()
+      
+      if (categoryError) {
+        toast.error(categoryError.message)
+       return
+      }
+     resolvedCategoryId = newCategory.id
+    }
+  }
+  
+  if (!resolvedCategoryId) {
+    toast.error(t('tool.categoryRequired'))
+  return
+  }
+  
+  if (!assetCode.trim() || !nameZh.trim() || !nameEn.trim()) {
+      toast.error(t('common.required'))
+    return
+  }
+  setSubmitting(true)
     try {
    const { error } = await supabase.from('tools').insert({
         warehouse_id: currentId,
@@ -531,46 +616,12 @@ export default function ToolList() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-700">{t('tool.category')} *</label>
-                      <label className="text-xs text-gray-400 flex items-center gap-1.5 cursor-pointer">
-                        <input
-                      type="checkbox"
-                          checked={manualCategory}
-                          onChange={() => setManualCategory((v) => !v)}
-                          className="rounded"
-                        />
-                        {t('scan.manualInput')}
-                      </label>
-                    </div>
-                    {!manualCategory ? (
-                      <select
-                        value={categoryId || (categories[0]?.id ?? '')}
-                        onChange={(e) => setCategoryId(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        disabled={categories.length === 0}
-                      >
-                        {categories.length === 0 ? (
-                          <option value="">{t('tool.noCategories')}</option>
-                        ) : (
-                          <>
-                            <option value="">{t('tool.selectCategory')}</option>
-                            {categories.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {(i18n.language === 'en' ? c.name_en : c.name_zh) || c.id}
-                              </option>
-                            ))}
-                          </>
-                        )}
-                      </select>
-                    ) : (
-                      <input
-                        value={categoryId}
-                        onChange={(e) => setCategoryId(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        placeholder="UUID (tool_categories.id)"
-                      />
-                    )}
+                    <label className="block text-sm text-gray-700 mb-1">{t('tool.category')} *</label>
+                    <CategorySelector
+                      value={categoryId}
+                      onChange={setCategoryId}
+                      existingCategories={categories}
+                    />
                   </div>
 
                   <div className="md:col-span-2">
