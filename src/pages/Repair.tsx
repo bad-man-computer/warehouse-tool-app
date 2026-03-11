@@ -79,8 +79,20 @@ export default function Repair() {
 
   const handleCompleteRepair = async () => {
     if (!completeModal || !supabase || !isSupabaseConfigured()) return
+    
+    // 确保 tool 对象存在且 id 有效
     const tool = completeModal.tool
-    if (!tool) return
+    if (!tool) {
+      toast.error('工具信息不存在')
+      console.error('completeModal.tool is null/undefined:', completeModal)
+      return
+    }
+    if (!tool.id) {
+      toast.error('工具 ID 无效')
+      console.error('Tool ID is invalid:', tool)
+      return
+    }
+    
     const nextStatus = result === 'repaired' ? 'available' : 'lost'
     
     // 检查状态转换是否允许
@@ -91,6 +103,9 @@ export default function Repair() {
     
     setSubmitting(true)
     try {
+      console.log('更新维修记录:', completeModal.id)
+      console.log('更新工具状态:', tool.id, '->', nextStatus)
+      
       // 更新维修记录
       const { error: updateError } = await supabase!
         .from('repair_records')
@@ -103,6 +118,7 @@ export default function Repair() {
       
       if (updateError) {
         toast.error('更新维修记录失败：' + updateError.message)
+        console.error('Update error:', updateError)
         return
       }
       
@@ -114,6 +130,7 @@ export default function Repair() {
       
       if (statusError) {
         toast.error('更新工具状态失败：' + statusError.message)
+        console.error('Status error:', statusError)
         return
       }
       

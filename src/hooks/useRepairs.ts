@@ -27,22 +27,58 @@ export function useRepairs(warehouseId: string | null, tab: RepairTab) {
       try {
      const { data, error } = await supabase!
           .from('repair_records')
-          .select('*, tool:tools!inner(warehouse_id, asset_code, name_zh, name_en, status)')
+          .select(`
+            id,
+            tool_id,
+            reported_at,
+            description_zh,
+            description_en,
+            sent_at,
+            vendor,
+            cost,
+            expected_complete_at,
+            completed_at,
+            result,
+            tool:tools(
+              id,
+              warehouse_id,
+              asset_code,
+              name_zh,
+              name_en,
+              status
+            )
+          `)
         if (error) {
+          console.error('Failed to fetch repair records:', error)
           setRecords([])
           return
         }
-        let list = (data ?? [])
-          .filter((r: { tool: { warehouse_id: string } }) => r.tool?.warehouse_id === warehouseId)
-          .map((r: Record<string, unknown>) => ({
+        
+        // 处理数据，确保 tool 对象正确映射
+        let list = ((data as any[]) ?? [])
+          .map((r) => ({
             ...r,
-            tool: Array.isArray(r.tool) ? r.tool[0] : r.tool,
+            tool: r.tool || null,
           })) as RepairRecordWithTool[]
-        if (tab === 'repairing') list = list.filter((r) => r.tool?.status === 'repairing' && !r.result)
-        else if (tab === 'damaged') list = list.filter((r) => r.tool?.status === 'damaged')
-        else if (tab === 'completed') list = list.filter((r) => r.result != null)
+        
+        // 按仓库 ID 筛选
+        list = list.filter((r) => r.tool?.warehouse_id === warehouseId)
+        
+        // 按 tab 筛选
+        if (tab === 'repairing') {
+          list = list.filter((r) => r.tool?.status === 'repairing' && !r.result)
+        } else if (tab === 'damaged') {
+          list = list.filter((r) => r.tool?.status === 'damaged')
+        } else if (tab === 'completed') {
+          list = list.filter((r) => r.result != null)
+        }
+        
+        // 排序
         list.sort((a, b) => new Date(b.reported_at).getTime() - new Date(a.reported_at).getTime())
         setRecords(list)
+      } catch (err) {
+        console.error('Error fetching repair records:', err)
+        setRecords([])
       } finally {
         setLoading(false)
       }
