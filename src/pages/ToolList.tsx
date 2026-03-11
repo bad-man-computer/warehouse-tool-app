@@ -164,7 +164,7 @@ export default function ToolList() {
      resolvedCategoryId = existingCategory.id
     } else {
       // 创建新分类
-     const { data: newCategory, error: categoryError } = await supabase
+     const { data: newCategory, error: categoryError } = await supabase!
         .from('tool_categories')
         .insert({
          warehouse_id: currentId,
@@ -175,7 +175,13 @@ export default function ToolList() {
         .single()
       
       if (categoryError) {
-        toast.error(categoryError.message)
+       console.error('创建自定义分类失败:', categoryError)
+        // 如果是 RLS 权限问题，给用户更友好的提示
+       if (categoryError.message.includes('row-level security')) {
+         toast.error('分类创建失败：您的账户可能没有创建分类的权限。请联系管理员。')
+       } else {
+         toast.error(categoryError.message || '创建分类失败')
+       }
        return
       }
      resolvedCategoryId = newCategory.id
@@ -205,7 +211,7 @@ export default function ToolList() {
     if (existingCategory) {
      resolvedCategoryId = existingCategory.id
     } else {
-     const { data: newCategory, error: categoryError } = await supabase
+     const { data: newCategory, error: categoryError } = await supabase!
         .from('tool_categories')
         .insert({
          warehouse_id: currentId,
@@ -216,7 +222,12 @@ export default function ToolList() {
         .single()
       
       if (categoryError) {
-        toast.error(categoryError.message)
+       console.error('创建预设分类失败:', categoryError)
+       if (categoryError.message.includes('row-level security')) {
+         toast.error('分类创建失败：您的账户可能没有创建分类的权限。请联系管理员。')
+       } else {
+         toast.error(categoryError.message || '创建分类失败')
+       }
        return
       }
      resolvedCategoryId = newCategory.id
@@ -228,9 +239,10 @@ export default function ToolList() {
   return
   }
   
-  if (!assetCode.trim() || !nameZh.trim() || !nameEn.trim()) {
+  // 资产编号必填，中英文名称至少填一个
+  if (!assetCode.trim() || (!nameZh.trim() && !nameEn.trim())) {
       toast.error(t('common.required'))
-    return
+  return
   }
   setSubmitting(true)
     try {
