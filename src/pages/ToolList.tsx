@@ -31,6 +31,13 @@ export default function ToolList() {
   const [selectedForPrint, setSelectedForPrint] = useState<Set<string>>(new Set())
   const [copied, setCopied] = useState(false)
   const [generatedAssetCode, setGeneratedAssetCode] = useState(false)
+  
+  // 维修相关
+  const [sendRepairTool, setSendRepairTool] = useState<Tool | null>(null)
+  const [repairDesc, setRepairDesc] = useState('')
+  const [repairVendor, setRepairVendor] = useState('')
+  const [repairCost, setRepairCost] = useState('')
+  const [repairSentAt, setRepairSentAt] = useState(new Date().toISOString().slice(0, 10))
 
   // Form state
   const [assetCode, setAssetCode] = useState('')
@@ -303,6 +310,67 @@ export default function ToolList() {
     } catch (e) {
       toast.error(String(e))
     }
+  }
+
+  // 标记工具为损坏状态
+  const markAsDamaged = async (tool: Tool) => {
+   if (!window.confirm(`确定要将 "${tool[nameKey]}" 标记为损坏吗？`)) return
+   
+   try {
+     const { error } = await supabase!
+       .from('tools')
+       .update({ status: 'damaged' })
+       .eq('id', tool.id)
+     
+     if (error) throw error
+     toast.success('工具已标记为损坏')
+     loadTools()
+   } catch (e) {
+     toast.error('操作失败：' + String(e))
+   }
+  }
+
+  // 送修工具
+  const handleSendRepair = async () => {
+   if (!sendRepairTool || !currentId) return
+   
+   setSubmitting(true)
+   try {
+     // 创建维修记录
+     const { error: repairError } = await supabase!
+       .from('repair_records')
+       .insert({
+         tool_id: sendRepairTool.id,
+         reported_at: new Date().toISOString(),
+         description_zh: repairDesc.trim() || null,
+         sent_at: new Date(repairSentAt).toISOString(),
+         vendor: repairVendor.trim() || null,
+         cost: repairCost ? Number(repairCost) : null,
+         expected_complete_at: null,
+         result: null,
+       })
+     
+     if (repairError) throw repairError
+     
+     // 更新工具状态为维修中
+     const { error: statusError } = await supabase!
+       .from('tools')
+       .update({ status: 'repairing' })
+       .eq('id', sendRepairTool.id)
+     
+     if (statusError) throw statusError
+     
+     toast.success('工具已送修')
+     setSendRepairTool(null)
+     setRepairDesc('')
+     setRepairVendor('')
+     setRepairCost('')
+     loadTools()
+   } catch (e) {
+     toast.error('操作失败：' + String(e))
+   } finally {
+     setSubmitting(false)
+   }
   }
 
   const togglePrintSelect = (toolId: string) => {
@@ -726,6 +794,26 @@ export default function ToolList() {
                       >
                         {t('tool.showQr')}
                       </button>
+                      {canAdd && tool.status !== 'damaged' && tool.status !== 'repairing' && (
+                        <button
+                       type="button"
+                          className="text-amber-600 hover:underline text-xs"
+                          onClick={() => markAsDamaged(tool)}
+                        >
+                          标记为损坏
+                        </button>
+                      )}
+                      {(tool.status === 'damaged' || tool.status === 'repairing') && (
+                        <button
+                       type="button"
+                          className="text-blue-600 hover:underline text-xs"
+                          onClick={() => {
+                         setSendRepairTool(tool)
+                       }}
+                        >
+                          送修
+                        </button>
+                      )}
                       <button
                      type="button"
                         className="text-gray-500 hover:underline text-xs"
@@ -801,6 +889,81 @@ export default function ToolList() {
                 onClick={() => setShowQr(null)}
               >
                 {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 送修表单 Modal */}
+      {sendRepairTool && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setSendRepairTool(null)}
+        >
+          <div
+            className="bg-white rounded-lg max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-medium text-gray-800 mb-4">
+              送修工具 - {sendRepairTool.asset_code}
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">故障描述</label>
+                <textarea
+                  value={repairDesc}
+                  onChange={(e) => setRepairDesc(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  rows={3}
+                  placeholder="请描述工具的故障情况..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">维修厂商</label>
+                <input
+                  type="text"
+                  value={repairVendor}
+                  onChange={(e) => setRepairVendor(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  placeholder="例如：XX 维修店"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">预计费用（元）</label>
+                <input
+                  type="number"
+                  value={repairCost}
+                  onChange={(e) => setRepairCost(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">送修日期</label>
+                <input
+                  type="date"
+                  value={repairSentAt}
+                  onChange={(e) => setRepairSentAt(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={handleSendRepair}
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50 hover:bg-primary-700 transition-colors"
+              >
+                {submitting ? '保存中...' : '确认送修'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSendRepairTool(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                取消
               </button>
             </div>
           </div>
