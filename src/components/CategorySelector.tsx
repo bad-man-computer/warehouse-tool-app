@@ -129,10 +129,11 @@ export function CategorySelector({ value, onChange, existingCategories = [] }: C
   const isLangEn = i18n.language === 'en'
 
   const handlePresetSelect = (categoryId: string, itemName?: string) => {
-    if (itemName) {
-      // 如果选择了预设分类下的具体项目，使用 "分类 - 项目" 格式
-      onChange(`predefined-${categoryId}:${itemName}`)
+   if (itemName) {
+      // 如果选择了预设分类下的具体项目，使用 "分类：项目" 格式
+      onChange(`${categoryId}:${itemName}`)
     } else {
+      // 只选择大类，直接使用 categoryId (已经是 predefined-xxx 格式)
       onChange(categoryId)
     }
   }
