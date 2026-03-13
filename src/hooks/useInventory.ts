@@ -27,6 +27,7 @@ export function useInventoryTasks(warehouseId: string | null) {
         .from('inventory_tasks')
         .select('*')
         .eq('warehouse_id', warehouseId)
+        .eq('is_deleted', false)  // 只显示未删除的任务
         .order('created_at', { ascending: false })
         .then(({ data }) => setTasks((data as InventoryTask[]) ?? []))
     )

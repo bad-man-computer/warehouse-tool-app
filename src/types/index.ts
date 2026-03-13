@@ -93,6 +93,8 @@ export interface InventoryTask {
   shortage_count: number  // 盘亏数量
   created_at: string
   completed_at?: string | null
+  is_deleted?: boolean  // 是否已删除
+  deleted_at?: string | null  // 删除时间
 }
 
 export interface InventoryItem {

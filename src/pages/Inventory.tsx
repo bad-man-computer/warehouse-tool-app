@@ -21,6 +21,7 @@ export default function Inventory() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [scannedToolId, setScannedToolId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   
   const { tasks, loading: tasksLoading, refetch: refetchTasks } = useInventoryTasks(currentId)
   const { items, loading: itemsLoading, refetch: refetchItems } = useInventoryItems(selectedTaskId)
@@ -105,6 +106,39 @@ export default function Inventory() {
     }
   }
   
+  // 删除盘点任务
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm('确定要删除这个盘点任务吗？\n\n删除后无法恢复，所有盘点记录都将被标记为已删除。')) return
+    
+    setDeleting(true)
+    try {
+      // 软删除：更新 is_deleted 和 deleted_at
+      const { error } = await supabase!
+        .from('inventory_tasks')
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+        })
+        .eq('id', taskId)
+      
+      if (error) throw error
+      
+      toast.success(t('common.success'))
+      refetchTasks()
+      
+      // 如果删除的是当前选中的任务，返回列表页
+      if (selectedTaskId === taskId) {
+        setSelectedTaskId(null)
+        setStep('list')
+      }
+    } catch (error: any) {
+      console.error('删除盘点任务失败:', error)
+      toast.error(error.message || t('common.error'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+  
   // 扫描工具
   const handleScanTool = async (assetCode: string) => {
     if (!selectedTaskId || !currentId || !supabase) return
@@ -122,7 +156,7 @@ export default function Inventory() {
       if (toolError || !tool) {
         // 工具不存在 - 盘盈
         const confirmSurplus = window.confirm(
-          `未找到资产编号为 "${assetCode}" 的工具记录。\n\n是否要记录为盘盈（新增工具）？`
+          `${t('inventory.notFound', { code: assetCode })}\n\n${t('inventory.confirmSurplus')}`
         )
         
         if (confirmSurplus) {
@@ -231,7 +265,7 @@ export default function Inventory() {
     const unscannedCount = items.filter(i => i.actual_status === null).length
     if (unscannedCount > 0) {
       const confirm = window.confirm(
-        `还有 ${unscannedCount} 个工具未盘点，确定要结束本次盘点吗？\n\n未盘点的工具将自动标记为盘亏。`
+        `${t('inventory.unscannedCount', { count: unscannedCount })}\n\n${t('inventory.autoMarkShortage')}`
       )
       if (!confirm) return
     }
@@ -243,7 +277,7 @@ export default function Inventory() {
         .update({
           actual_status: 'lost',
           difference_type: 'shortage',
-          notes: '盘点未完成自动标记',
+          notes: t('inventory.incompleteTaskMark'),
           updated_at: new Date().toISOString(),
         })
         .eq('task_id', selectedTaskId)
@@ -343,6 +377,20 @@ export default function Inventory() {
                     >
                       {task.status === 'completed' ? t('inventory.report') : t('inventory.scanCheck')}
                     </button>
+                    {task.status === 'completed' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteTask(task.id)
+                        }}
+                        disabled={deleting}
+                        className="text-red-600 text-sm hover:underline disabled:opacity-50"
+                        title="删除盘点报告"
+                      >
+                        🗑️ 删除
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -420,7 +468,7 @@ export default function Inventory() {
             }}
           />
           <p className="text-xs text-gray-500 mt-1">
-            💡 使用扫码枪或手动输入资产编号，按回车确认
+            {t('inventory.scanHint')}
           </p>
         </div>
         
@@ -554,7 +602,7 @@ export default function Inventory() {
                 </div>
               ))}
               {items.filter(i => i.difference_type && i.difference_type !== 'match').length === 0 && (
-                <p className="text-gray-500 text-center py-4">无差异项</p>
+                <p className="text-gray-500 text-center py-4">{t('inventory.noDifferences')}</p>
               )}
             </div>
           )}
@@ -622,7 +670,7 @@ function ScanConfirmModal({ onConfirm, onCancel }: ScanConfirmModalProps) {
               onChange={(e) => setNotes(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
               rows={2}
-              placeholder="备注说明..."
+              placeholder={t('common.notesPlaceholder')}
             />
           </div>
         </div>
