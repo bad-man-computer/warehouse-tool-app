@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { Plus, Printer, Download, QrCode, X, Copy, Check, Camera } from 'lucide-react'
+import { Plus, Printer, Download, QrCode, X, Copy, Check } from 'lucide-react'
 import { useWarehouseStore } from '@/stores/warehouseStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'

@@ -54,7 +54,6 @@
     "category": "Category",
     "location": "Location",
     "status": "Status",
-    "photo": "Photo",
     "purchaseInfo": "Purchase Info",
     "qrCode": "QR Code",
     "showQr": "Show QR",
