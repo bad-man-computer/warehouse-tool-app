@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
+import { Camera } from 'lucide-react'
 import { useInventoryTasks, useInventoryItems } from '@/hooks/useInventory'
 import { useWarehouseStore } from '@/stores/warehouseStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -8,6 +9,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import type { ToolStatus } from '@/types'
 import { TOOL_STATUS } from '@/constants/toolStatus'
 import { formatDate } from '@/utils/format'
+import QrScannerModal from '@/components/QrScannerModal'
 
 // 盘点步骤类型
 type InventoryStep = 'list' | 'scan' | 'review' | 'report'
@@ -22,6 +24,7 @@ export default function Inventory() {
   const [scannedToolId, setScannedToolId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
   
   const { tasks, loading: tasksLoading, refetch: refetchTasks } = useInventoryTasks(currentId)
   const { items, loading: itemsLoading, refetch: refetchItems } = useInventoryItems(selectedTaskId)
@@ -455,18 +458,28 @@ export default function Inventory() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             {t('inventory.scanTool')}
           </label>
-          <input
-            type="text"
-            placeholder={t('tool.assetCode')}
-            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleScanTool(e.currentTarget.value)
-                e.currentTarget.value = ''
-              }
-            }}
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder={t('tool.assetCode')}
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleScanTool(e.currentTarget.value)
+                  e.currentTarget.value = ''
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowCamera(true)}
+              className="px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+              title={t('scan.openCamera')}
+            >
+              <Camera size={20} />
+            </button>
+          </div>
           <p className="text-xs text-gray-500 mt-1">
             {t('inventory.scanHint')}
           </p>
@@ -625,6 +638,16 @@ export default function Inventory() {
           onCancel={() => setScannedToolId(null)}
         />
       )}
+      
+      {/* 摄像头扫码对话框 */}
+      <QrScannerModal
+        isOpen={showCamera}
+        onClose={() => setShowCamera(false)}
+        onScan={(code) => {
+          handleScanTool(code)
+          setShowCamera(false)
+        }}
+      />
     </div>
   )
 }

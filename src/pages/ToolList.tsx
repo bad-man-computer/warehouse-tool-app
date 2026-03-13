@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
-import { Plus, Printer, Download, QrCode, X, Copy, Check } from 'lucide-react'
+import { Plus, Printer, Download, QrCode, X, Copy, Check, Camera } from 'lucide-react'
 import { useWarehouseStore } from '@/stores/warehouseStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
@@ -13,6 +13,7 @@ import QRCode from 'qrcode'
 import { useCategories } from '@/hooks/useCategories'
 import { CategorySelector } from '@/components/CategorySelector'
 import { PREDEFINED_CATEGORIES } from '@/components/CategorySelector'
+import { PhotoUploader } from '@/components/PhotoUploader'
 
 export default function ToolList() {
   const { t, i18n } = useTranslation()
@@ -56,6 +57,7 @@ export default function ToolList() {
   const [remarks, setRemarks] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
   const [formQrDataUrl, setFormQrDataUrl] = useState<string>('')
+  const [photoUrls, setPhotoUrls] = useState<string[]>([])
 
   const { categories } = useCategories(currentId)
 
@@ -115,6 +117,7 @@ export default function ToolList() {
     setFormQrDataUrl('')
     setCopied(false)
     setGeneratedAssetCode(false)
+    setPhotoUrls([])
   }
 
   const generateAssetCode = async () => {
@@ -271,6 +274,7 @@ export default function ToolList() {
      quantity: quantity,
       remarks: remarks.trim() || null,
       purchase_date: purchaseDate || null,
+      photo_urls: photoUrls.length > 0 ? photoUrls : null,
       })
    if (error) { toast.error(error.message); return }
       
@@ -752,6 +756,17 @@ export default function ToolList() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* 照片上传 */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('tool.photo')}
+                </label>
+                <PhotoUploader
+                  photos={photoUrls}
+                  onChange={setPhotoUrls}
+                />
               </div>
             </div>
 

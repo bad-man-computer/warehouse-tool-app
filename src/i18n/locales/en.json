@@ -78,7 +78,12 @@
     "quantity": "Quantity",
     "purchaseDate": "Purchase Date",
     "remarks": "Remarks",
-    "remarksPlaceholder": "Enter any additional notes..."
+    "remarksPlaceholder": "Enter any additional notes...",
+    "photo": "Photo",
+    "uploadFromGallery": "Upload from Gallery",
+    "takePhoto": "Take Photo",
+    "noPhotos": "No photos",
+    "addPhotos": "Add Photos"
   },
   "scan": {
     "cameraTitle": "Scan QR Code",
