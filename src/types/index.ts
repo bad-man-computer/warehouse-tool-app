@@ -81,7 +81,16 @@ export interface InventoryTask {
   id: string
   warehouse_id: string
   operator_id?: string | null
+  name?: string | null  // 任务名称
+  description_zh?: string | null  // 中文描述
+  description_en?: string | null  // 英文描述
   status: 'in_progress' | 'completed'
+  scheduled_at?: string | null  // 计划完成时间
+  total_items: number  // 应盘总数
+  scanned_items: number  // 已盘数量
+  match_count: number  // 相符数量
+  surplus_count: number  // 盘盈数量
+  shortage_count: number  // 盘亏数量
   created_at: string
   completed_at?: string | null
 }
@@ -95,7 +104,11 @@ export interface InventoryItem {
   actual_status: ToolStatus | null
   difference_type: DifferenceType | null
   notes?: string | null
+  operator_id?: string | null  // 盘点人
+  actual_quantity?: number | null  // 实际数量
+  expected_quantity?: number | null  // 预期数量
   created_at: string
+  updated_at?: string | null
 }
 
 export interface RepairRecord {
